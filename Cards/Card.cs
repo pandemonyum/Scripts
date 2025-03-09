@@ -1,8 +1,12 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
+using System.Collections;
 
-public class Card : MonoBehaviour
+// Aggiungiamo le interfacce necessarie per gestire interazioni e drag and drop
+public class Card : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
+                   IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
 {
     public CardData cardData;
     
@@ -11,23 +15,51 @@ public class Card : MonoBehaviour
     public TextMeshProUGUI nameText;
     public TextMeshProUGUI descriptionText;
     public TextMeshProUGUI costText;
-    public Image cardFrame; // Background/frame dell'immagine
+    public Image cardFrame;
     
     [Header("Card Behavior")]
-    private bool isDragging;
     private Vector3 startPosition;
     private Transform originalParent;
+    private bool isDragging = false;
+    
+    [Header("Hover Effect")]
+    public float hoverScaleFactor = 1.2f;
+    public float hoverYOffset = 30f;
+    public float hoverAnimationSpeed = 0.2f;
+    private Vector3 originalScale;
+    private bool isHovering = false;
+    
+    [Header("Playable Zone")]
+    private PlayZone playZone;
+    private CombatManager combatManager;
     
     // Colori per i diversi tipi di carte
     private Color attackColor = new Color(0.8f, 0.2f, 0.2f);
     private Color skillColor = new Color(0.2f, 0.5f, 0.8f);
     private Color powerColor = new Color(0.6f, 0.2f, 0.8f);
-    
+
+    private Vector3 originalPosition;
+
+    [Header("Targeting")]
+    public bool requiresTarget = false;
     void Start()
     {
         if (cardData != null)
         {
             UpdateCardVisuals();
+        }
+        
+        originalScale = transform.localScale;
+        originalPosition = transform.position;
+
+        // Trova i riferimenti necessari
+        playZone = FindObjectOfType<PlayZone>();
+        combatManager = FindObjectOfType<CombatManager>();
+        
+        // Se non trovi il PlayZone, mostra un warning
+        if (playZone == null)
+        {
+            Debug.LogWarning("PlayZone non trovata. Assicurati di creare un oggetto con il componente PlayZone.");
         }
     }
     
@@ -36,7 +68,12 @@ public class Card : MonoBehaviour
         cardData = data;
         UpdateCardVisuals();
     }
-    
+    // Metodo per resettare la posizione originale (utile quando la carta viene riordinata nella mano)
+    public void ResetOriginalPosition()
+    {
+        originalPosition = transform.position;
+    }
+        
     void UpdateCardVisuals()
     {
         // Aggiorna tutti gli elementi visivi della carta
@@ -64,9 +101,86 @@ public class Card : MonoBehaviour
         }
     }
     
-    // Gestione degli eventi di input per trascinare le carte
-    public void OnBeginDrag()
+    // IMPLEMENTAZIONE EFFETTO HOVER
+    
+    public void OnPointerEnter(PointerEventData eventData)
     {
+        if (!isDragging)
+        {
+            isHovering = true;
+            StopAllCoroutines();
+            StartCoroutine(ScaleCard(originalScale * hoverScaleFactor, hoverAnimationSpeed));
+            StartCoroutine(MoveCardTo(originalPosition + new Vector3(0, hoverYOffset, 0), hoverAnimationSpeed));
+        }
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (!isDragging)
+        {
+            isHovering = false;
+            StopAllCoroutines();
+            StartCoroutine(ScaleCard(originalScale, hoverAnimationSpeed));
+            StartCoroutine(MoveCardTo(originalPosition, hoverAnimationSpeed));
+        }
+    }
+    
+    IEnumerator ScaleCard(Vector3 targetScale, float duration)
+    {
+        Vector3 startScale = transform.localScale;
+        float time = 0;
+        
+        while (time < duration)
+        {
+            transform.localScale = Vector3.Lerp(startScale, targetScale, time / duration);
+            time += Time.deltaTime;
+            yield return null;
+        }
+        
+        transform.localScale = targetScale;
+    }
+    
+    IEnumerator MoveCardUp(float targetYOffset, float duration)
+    {
+        Vector3 startPosition = transform.position;
+        Vector3 targetPosition = startPosition + new Vector3(0, targetYOffset, 0);
+        float time = 0;
+        
+        while (time < duration)
+        {
+            transform.position = Vector3.Lerp(startPosition, targetPosition, time / duration);
+            time += Time.deltaTime;
+            yield return null;
+        }
+        
+        transform.position = targetPosition;
+    }
+    IEnumerator MoveCardTo(Vector3 targetPosition, float duration)
+    {
+        Vector3 startPosition = transform.position;
+        float time = 0;
+        
+        while (time < duration)
+        {
+            transform.position = Vector3.Lerp(startPosition, targetPosition, time / duration);
+            time += Time.deltaTime;
+            yield return null;
+        }
+        
+        transform.position = targetPosition;
+    }
+    
+    // IMPLEMENTAZIONE DRAG AND DROP
+    
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        // Se non abbiamo abbastanza energia, non permettiamo di trascinare
+        if (combatManager != null && cardData.energyCost > combatManager.currentEnergy)
+        {
+            eventData.pointerDrag = null;
+            return;
+        }
+        
         isDragging = true;
         startPosition = transform.position;
         originalParent = transform.parent;
@@ -74,39 +188,129 @@ public class Card : MonoBehaviour
         // Sposta la carta in primo piano mentre viene trascinata
         transform.SetParent(transform.root);
         GetComponent<CanvasGroup>().blocksRaycasts = false;
+        
+        // Riporta la carta alla scala originale durante il drag
+        StopAllCoroutines();
+        transform.localScale = originalScale * 1.05f; // Leggermente più grande per visibilità
     }
     
-    public void OnDrag(Vector2 position)
+    public void OnDrag(PointerEventData eventData)
     {
         if (isDragging)
         {
-            transform.position = position;
+            transform.position = eventData.position;
         }
     }
     
-    public void OnEndDrag()
+    public void OnEndDrag(PointerEventData eventData)
     {
         isDragging = false;
         GetComponent<CanvasGroup>().blocksRaycasts = true;
         
-        // Implementare qui la logica per giocare la carta o riportarla alla mano
-        // Per ora, torniamo semplicemente alla posizione iniziale
-        transform.position = startPosition;
-        transform.SetParent(originalParent);
+        // Verifica se la carta è stata rilasciata sulla zona di gioco
+        if (playZone != null && playZone.IsCardOverPlayZone(this))
+        {
+            PlayCard();
+        }
+        else
+        {
+            // Ritorna alla posizione originale
+            transform.SetParent(originalParent);
+            transform.position = startPosition;
+            
+            // Ripristina l'effetto hover se il mouse è ancora sopra la carta
+            if (isHovering)
+            {
+                StartCoroutine(ScaleCard(originalScale * hoverScaleFactor, hoverAnimationSpeed));
+                StartCoroutine(MoveCardUp(hoverYOffset, hoverAnimationSpeed));
+            }
+            else
+            {
+                transform.localScale = originalScale;
+            }
+        }
+    }
+    
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        // Se siamo in modalità targeting e questa carta è stata selezionata per targeting
+        Debug.Log("Giocata carta: ");
+        TargetingSystem targetingSystem = FindObjectOfType<TargetingSystem>();
+        if (targetingSystem != null && targetingSystem.isTargeting && targetingSystem.selectedCard == this)
+        {
+            // Conferma il bersaglio con un click
+            targetingSystem.ConfirmTarget();
+        }
+        // Altrimenti, potresti implementare altre funzionalità di click
     }
     
     // Metodo per giocare la carta
+ 
     public void PlayCard()
     {
-        // Qui implementeremo l'effetto della carta quando viene giocata
         Debug.Log("Giocata carta: " + cardData.cardName);
         
-        // Esempio semplificato dell'effetto della carta
+        if (combatManager == null)
+        {
+            combatManager = FindObjectOfType<CombatManager>();
+        }
+        
+        // Se la carta richiede un bersaglio, attiva il sistema di targeting
+        if (requiresTarget && cardData.cardType == CardData.CardType.Attack)
+        {
+            // Verifica se abbiamo abbastanza energia prima di iniziare il targeting
+            if (combatManager == null || combatManager.currentEnergy >= cardData.energyCost)
+            {
+                // Attiva il sistema di targeting
+                TargetingSystem targetingSystem = FindObjectOfType<TargetingSystem>();
+                if (targetingSystem != null)
+                {
+                    targetingSystem.StartTargeting(this);
+                    return; // Non completare il gioco della carta ora
+                }
+            }
+        }
+        
+        // Per carte che non richiedono bersaglio, o se il targeting fallisce
+        // continua con la logica normale
+        if (combatManager != null && combatManager.TryPlayCard(cardData, cardData.energyCost))
+        {
+            // Applica l'effetto della carta
+            ApplyCardEffect();
+            
+            // Rimuovi la carta dalla mano
+            Hand hand = originalParent.GetComponent<Hand>();
+            if (hand != null)
+            {
+                hand.RemoveCard(this);
+            }
+            
+            // Distruggi la carta
+            Destroy(gameObject);
+        }
+        else
+        {
+            // Non abbastanza energia, torna nella mano
+            transform.SetParent(originalParent);
+            transform.position = startPosition;
+            transform.localScale = originalScale;
+        }
+    }
+    // Metodo per applicare l'effetto della carta
+    void ApplyCardEffect()
+    {
         switch (cardData.cardType)
         {
             case CardData.CardType.Attack:
                 // Infligge danno al bersaglio
                 Debug.Log("Infligge " + cardData.damage + " danno");
+                
+                // Trova un nemico e infliggi danno
+                Enemy targetEnemy = FindObjectOfType<Enemy>();
+                if (targetEnemy != null)
+                {
+                    targetEnemy.TakeDamage(cardData.damage);
+                }
                 break;
                 
             case CardData.CardType.Skill:
@@ -114,16 +318,57 @@ public class Card : MonoBehaviour
                 if (cardData.block > 0)
                 {
                     Debug.Log("Aggiunge " + cardData.block + " blocco");
+                    // TODO: Aggiungi blocco al giocatore
                 }
                 break;
                 
             case CardData.CardType.Power:
                 // Aggiunge un effetto permanente
                 Debug.Log("Attiva potere: " + cardData.description);
+                // TODO: Implementa effetti potere
                 break;
         }
-        
-        // Dopo aver giocato la carta, la rimuoviamo
-        Destroy(gameObject);
     }
+    // Metodo per applicare l'effetto della carta
+    public void ApplyCardEffect(Enemy target)
+    {
+        if (combatManager == null)
+        {
+            combatManager = FindObjectOfType<CombatManager>();
+        }
+        
+        // Verifica se abbiamo abbastanza energia
+        if (combatManager != null && combatManager.TryPlayCard(cardData, cardData.energyCost))
+        {
+            Debug.Log("Giocata carta: " + cardData.cardName + " su bersaglio: " + target.enemyName);
+            
+            switch (cardData.cardType)
+            {
+                case CardData.CardType.Attack:
+                    // Infligge danno al bersaglio specificato
+                    Debug.Log("Infligge " + cardData.damage + " danno a " + target.enemyName);
+                    target.TakeDamage(cardData.damage);
+                    break;
+                    
+                // Per altri tipi di carte, implementa logica specifica
+                case CardData.CardType.Skill:
+                case CardData.CardType.Power:
+                    // Usa la logica generica per carte non mirate
+                    ApplyCardEffect();
+                    break;
+            }
+            
+            // Rimuovi la carta dalla mano
+            Hand hand = originalParent.GetComponent<Hand>();
+            if (hand != null)
+            {
+                hand.RemoveCard(this);
+            }
+            
+            // Distruggi la carta
+            Destroy(gameObject);
+        }
+    }
+
+    
 }

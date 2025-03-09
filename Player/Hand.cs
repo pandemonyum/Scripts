@@ -74,7 +74,13 @@ public class Hand : MonoBehaviour
             
             // Ruota leggermente le carte
             card.localRotation = Quaternion.Euler(0, 0, -angle);
+            Card cardComponent = card.GetComponent<Card>();
+            if (cardComponent != null)
+            {
+                cardComponent.ResetOriginalPosition();
+            }
         }
+        
     }
     
     // Scarta tutta la mano
