@@ -47,14 +47,18 @@ public class Card : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
         if (cardData != null)
         {
             UpdateCardVisuals();
+            if (cardData.cardType == CardData.CardType.Attack)
+            {
+                requiresTarget = true;
+            }
         }
         
         originalScale = transform.localScale;
         originalPosition = transform.position;
 
         // Trova i riferimenti necessari
-        playZone = FindObjectOfType<PlayZone>();
-        combatManager = FindObjectOfType<CombatManager>();
+        playZone = FindFirstObjectByType<PlayZone>();
+        combatManager = FindFirstObjectByType<CombatManager>();
         
         // Se non trovi il PlayZone, mostra un warning
         if (playZone == null)
@@ -235,7 +239,7 @@ public class Card : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
     {
         // Se siamo in modalità targeting e questa carta è stata selezionata per targeting
         Debug.Log("Giocata carta: ");
-        TargetingSystem targetingSystem = FindObjectOfType<TargetingSystem>();
+        TargetingSystem targetingSystem = FindFirstObjectByType<TargetingSystem>();
         if (targetingSystem != null && targetingSystem.isTargeting && targetingSystem.selectedCard == this)
         {
             // Conferma il bersaglio con un click
@@ -252,23 +256,20 @@ public class Card : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
         
         if (combatManager == null)
         {
-            combatManager = FindObjectOfType<CombatManager>();
+            combatManager = FindFirstObjectByType<CombatManager>();
         }
         
         // Se la carta richiede un bersaglio, attiva il sistema di targeting
-        if (requiresTarget && cardData.cardType == CardData.CardType.Attack)
-        {
-            // Verifica se abbiamo abbastanza energia prima di iniziare il targeting
-            if (combatManager == null || combatManager.currentEnergy >= cardData.energyCost)
-            {
+        if (requiresTarget && combatManager != null && combatManager.currentEnergy >= cardData.energyCost)
+    {
                 // Attiva il sistema di targeting
-                TargetingSystem targetingSystem = FindObjectOfType<TargetingSystem>();
+                TargetingSystem targetingSystem = FindFirstObjectByType<TargetingSystem>();
                 if (targetingSystem != null)
                 {
                     targetingSystem.StartTargeting(this);
                     return; // Non completare il gioco della carta ora
                 }
-            }
+            
         }
         
         // Per carte che non richiedono bersaglio, o se il targeting fallisce
@@ -306,7 +307,7 @@ public class Card : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
                 Debug.Log("Infligge " + cardData.damage + " danno");
                 
                 // Trova un nemico e infliggi danno
-                Enemy targetEnemy = FindObjectOfType<Enemy>();
+                Enemy targetEnemy = FindFirstObjectByType<Enemy>();
                 if (targetEnemy != null)
                 {
                     targetEnemy.TakeDamage(cardData.damage);
@@ -334,7 +335,7 @@ public class Card : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
     {
         if (combatManager == null)
         {
-            combatManager = FindObjectOfType<CombatManager>();
+            combatManager = FindFirstObjectByType<CombatManager>();
         }
         
         // Verifica se abbiamo abbastanza energia
