@@ -395,4 +395,6 @@ public class CombatManager : MonoBehaviour
         // Qui puoi implementare la visualizzazione degli scarti
         Debug.Log("Carte nella pila degli scarti: " + discardPile.Count);
     }
+
+      
 }

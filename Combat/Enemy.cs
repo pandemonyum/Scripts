@@ -28,6 +28,10 @@ public class Enemy : MonoBehaviour
     public Sprite defendIntentionIcon;
     public Sprite buffIntentionIcon;
     public Sprite debuffIntentionIcon;
+
+    [Header("Block Display")]
+    public GameObject blockDisplay;  // A GameObject that contains your block icon and text
+    public TextMeshProUGUI blockText;  // Text to show the block amount
     
     // Riferimento al combat manager
     private CombatManager combatManager;
@@ -154,6 +158,11 @@ public class Enemy : MonoBehaviour
                 return;
             }
         }
+        if (currentBlock > 0)
+        {
+            currentBlock = 0;
+            UpdateBlockUI();
+        }
         
         // Esegui l'azione in base all'intenzione corrente
         switch (currentIntention)
@@ -186,10 +195,14 @@ public class Enemy : MonoBehaviour
                 blockModifier = 0;
             }
         }
+
         
         // Imposta una nuova intenzione per il prossimo turno
         SetRandomIntention();
     }
+
+   
+
     
     // Esegue un attacco contro il giocatore
     void PerformAttack()
@@ -272,7 +285,25 @@ public class Enemy : MonoBehaviour
     {
         currentBlock += amount;
         // Qui aggiorna un'eventuale UI del blocco nemico
+        UpdateBlockUI();
     }
+
+    private void UpdateBlockUI()
+{
+    if (blockDisplay != null)
+    {
+        // Only show the block display when there is block
+        blockDisplay.SetActive(currentBlock > 0);
+    }
+    
+    if (blockText != null)
+    {
+        if(currentBlock==0)
+            blockText.text = "";
+        else
+            blockText.text = currentBlock.ToString();
+    }
+}
     
     // Prende danno, tenendo conto del blocco
     public void TakeDamage(int amount)
@@ -290,6 +321,7 @@ public class Enemy : MonoBehaviour
                 amount -= currentBlock;
                 currentBlock = 0;
             }
+             UpdateBlockUI();
         }
         
         // Poi applica il danno rimanente

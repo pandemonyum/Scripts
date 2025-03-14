@@ -2,8 +2,11 @@ using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
+     public static GameManager Instance { get; private set; }
     public Hand playerHand;
     
+    public CombatManager combatManager;
+
     // Riferimenti alle carte (dovrai creare questi ScriptableObjects)
     public CardData[] testCards;
     
@@ -11,6 +14,14 @@ public class GameManager : MonoBehaviour
     {
         // Test: aggiungi alcune carte alla mano
         DrawStartingHand();
+    }
+    void Awake()
+    {
+        // Simple singleton pattern
+        if (Instance == null)
+            Instance = this;
+        else
+            Destroy(gameObject);
     }
     
     void DrawStartingHand()
@@ -35,4 +46,5 @@ public class GameManager : MonoBehaviour
             playerHand.AddCard(testCards[randomIndex]);
         }
     }
+
 }
