@@ -110,8 +110,7 @@ public class CombatManager : MonoBehaviour
         // All'inizio di ogni turno, il blocco si resetta
         currentBlock = 0;
         
-        // Aggiorna la UI
-        UpdateAllUI();
+       
         
         // Pesca le carte (5 carte standard)
         for (int i = 0; i < 5; i++)
@@ -124,6 +123,8 @@ public class CombatManager : MonoBehaviour
         {
             endTurnButton.interactable = true;
         }
+         // Aggiorna la UI
+        UpdateAllUI();
     }
     
     public void EndPlayerTurn()
@@ -136,14 +137,23 @@ public class CombatManager : MonoBehaviour
             endTurnButton.interactable = false;
         }
         
+        DiscardCarteRimaste();
         // Scarta tutte le carte dalla mano
         playerHand.DiscardHand();
         
+
         // Aggiorna i contatori del mazzo
         UpdateDeckCounters();
         
         // Avvia il turno del nemico
         StartCoroutine(EnemyTurnSequence());
+    }
+
+    private void DiscardCarteRimaste(){
+        foreach (CardData card in playerHand.cardsInHand)
+        {
+            discardPile.Add(card);
+        }
     }
     
     IEnumerator EnemyTurnSequence()
